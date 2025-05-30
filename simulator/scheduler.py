@@ -73,4 +73,24 @@ class RandomScheduler(Scheduler):
                    history: Dict[int,List[Dict]]
                   ) -> List[Tuple[int, GPU]]:
         # TODO: implement the logic to randomly select requests from the current tenant's queue
-        return []
+        # return []
+        assignments: List[Tuple[int, GPU]] = []
+        total_free_slots = sum([gpu.free_slots() for gpu in gpus])
+        if total_free_slots == 0:
+            return []
+        avail_gpus = {gpu: gpu.free_slots() for gpu in gpus if gpu.free_slots() > 0}
+        for tenant, req_queue in all_req_queues.items():
+            for r in req_queue: # sequentially select requests
+                if r.id not in history:
+                    total_free_slots -= 1
+                    for gpu, free_slots in avail_gpus.items(): # sequentially select assigned gpus
+                        if free_slots > 0:
+                            assignments.append((r.id, gpu))
+                            avail_gpus[gpu] -= 1
+                            break
+                    assert assignments[-1][0] == r.id
+                    if total_free_slots == 0:
+                        print([(req_id, gpu.gid) for req_id, gpu in assignments])
+                        return assignments
+        print([(req_id, gpu.gid) for req_id, gpu in assignments])                    
+        return assignments

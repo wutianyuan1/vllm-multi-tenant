@@ -37,7 +37,7 @@ class GPU:
 
     def remove(self, req: Request) -> int:
         for i, r in enumerate(self.slots):
-            if r.id == req.id:
+            if r is not None and r.id == req.id:
                 self.slots[i] = None
                 return i
         raise RuntimeError("Request not found")

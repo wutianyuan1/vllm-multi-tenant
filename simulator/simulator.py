@@ -95,6 +95,10 @@ class Simulator:
                 segs[-1]['end'] = now
                 # TODO: Update tenant finish time
                 # if all done: finish_time[t] = xxxx
+                finished = all([r.id in self.history and self.history[r.id][-1]['end'] is not None for r in self.all_req_queues[req.tenant]])
+                if finished:
+                    assert now == max([self.history[r.id][-1]['end'] for r in self.all_req_queues[req.tenant]])
+                    self.finish_time[req.tenant] = now
 
             # Trigger migration
             ops = self.scheduler.migrate(self.gpus, now, self.history)
@@ -102,6 +106,7 @@ class Simulator:
                 # The previous segment is done, will run on the migrated GPU
                 self.history[req.id][-1]['end'] = now
                 self.gpus[from_gpu].remove(req)
+                req.remaining -= now - self.history[req.id][-1]['start']
                 # TODO: migration cost due to data transfer
                 self.gpus[to_gpu].assign(req, now)
                 self._schedule_finish(req, now)
@@ -152,6 +157,7 @@ if __name__ == "__main__":
         1: sorted([random.randint(20,100) for _ in range(12)]),
         2: sorted([random.randint(20,100) for _ in range(12)]),
     }
+    print(tenants)
     sim = Simulator(tenants, ngpus=3, per_gpu_max_bsz=4, scheduler=RandomScheduler())
     finish, history = sim.run()
     print("Finish:", finish)
