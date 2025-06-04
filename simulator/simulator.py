@@ -154,9 +154,9 @@ def plot_timeline(history: Dict[int,List[Dict]],
 if __name__ == "__main__":
     random.seed(42)  # For reproducibility
     tenants = {
-        0: sorted([random.randint(20,100) for _ in range(12)]),
-        1: sorted([random.randint(20,100) for _ in range(12)]),
-        2: sorted([random.randint(20,100) for _ in range(12)]),
+        0: ([random.randint(20,100) for _ in range(12)]),
+        1: ([random.randint(20,100) for _ in range(12)]),
+        2: ([random.randint(20,100) for _ in range(12)]),
     }
     print(tenants)
     scheduler = SequentialScheduler(
