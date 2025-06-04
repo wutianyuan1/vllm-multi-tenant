@@ -45,3 +45,6 @@ class GPU:
     def load(self) -> int:
         """Current load: sum of remaining on all slots"""
         return sum(r.remaining for r in self.slots if r)
+
+    def __repr__(self):
+        return f"<GPU{self.gid} T={self.cur_idx} free_slots={self.free_slots()}>"

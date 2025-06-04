@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from typing import List, Dict, Tuple
 from simulator.objects import Request, GPU
-from simulator.scheduler import Scheduler, RandomScheduler
+from simulator.scheduler import Scheduler, SequentialScheduler
 
 
 class Simulator:
@@ -152,13 +152,17 @@ def plot_timeline(history: Dict[int,List[Dict]],
 
 
 if __name__ == "__main__":
+    random.seed(42)  # For reproducibility
     tenants = {
         0: sorted([random.randint(20,100) for _ in range(12)]),
         1: sorted([random.randint(20,100) for _ in range(12)]),
         2: sorted([random.randint(20,100) for _ in range(12)]),
     }
     print(tenants)
-    sim = Simulator(tenants, ngpus=3, per_gpu_max_bsz=4, scheduler=RandomScheduler())
+    scheduler = SequentialScheduler(
+        allow_continuous_batching=True,
+        allow_cross_model_continuous_batching=False)
+    sim = Simulator(tenants, ngpus=3, per_gpu_max_bsz=4, scheduler=scheduler)
     finish, history = sim.run()
     print("Finish:", finish)
     plot_timeline(history, tenants, ngpus=3, cap=4)
