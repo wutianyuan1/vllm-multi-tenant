@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from typing import List, Dict, Tuple
 from simulator.objects import Request, GPU
-from simulator.scheduler import Scheduler, RandomScheduler
+from simulator.scheduler import Scheduler, RandomScheduler, NaiveSequentialSelectScheduler, LongestFirstScheduler
 
 
 class Simulator:
@@ -120,7 +120,8 @@ class Simulator:
 def plot_timeline(history: Dict[int,List[Dict]],
                   tenants: Dict[int,List[int]],
                   ngpus: int,
-                  cap: int):
+                  cap: int,
+                  filename: str = 'timeline'):
     cmap = plt.get_cmap('tab10')
     tenant_list = sorted(tenants.keys())
     color_map = {t: cmap(i) for i, t in enumerate(tenant_list)}
@@ -148,17 +149,63 @@ def plot_timeline(history: Dict[int,List[Dict]],
               bbox_to_anchor=(1.05,1), loc="upper left")
     ax.invert_yaxis()
     plt.tight_layout()
-    plt.savefig("simulator/timeline.png")
+    plt.savefig(f"simulator/{filename}.png")
 
 
 if __name__ == "__main__":
+    random.seed(0)
     tenants = {
         0: sorted([random.randint(20,100) for _ in range(12)]),
         1: sorted([random.randint(20,100) for _ in range(12)]),
         2: sorted([random.randint(20,100) for _ in range(12)]),
     }
-    print(tenants)
-    sim = Simulator(tenants, ngpus=3, per_gpu_max_bsz=4, scheduler=RandomScheduler())
+    for t_id, req_lengths in tenants.items():
+        print(t_id, req_lengths)
+    ngpus = 3
+    per_gpu_max_bsz = 4
+    lower_bound = {t_id: sum([sum(req_lengths) for req_lengths in list(tenants.values())[: i + 1]]) / (ngpus * per_gpu_max_bsz) for i, t_id in enumerate(tenants)}
+    # Sequential
+    best_history_and_finish = {t_id: None for t_id in tenants}
+    best_ft = {t_id: float('inf') for t_id in tenants}
+    sim = Simulator(tenants, ngpus=ngpus, per_gpu_max_bsz=per_gpu_max_bsz, scheduler=NaiveSequentialSelectScheduler())
     finish, history = sim.run()
-    print("Finish:", finish)
-    plot_timeline(history, tenants, ngpus=3, cap=4)
+    for t_id in tenants:
+        if finish[t_id] < best_ft[t_id]:
+            best_ft[t_id] = finish[t_id]
+            best_history_and_finish[t_id] = (history, finish)
+    print(repr(NaiveSequentialSelectScheduler))
+    print(lower_bound)
+    last_t_id = list(tenants.keys())[-1]
+    print(best_history_and_finish[last_t_id][1])
+    plot_timeline(best_history_and_finish[last_t_id][0], tenants, ngpus, per_gpu_max_bsz, 'sequential')
+
+    # Random
+    best_history_and_finish = {t_id: None for t_id in tenants}
+    best_ft = {t_id: float('inf') for t_id in tenants}
+    for i in range(10000):
+        random.seed(i)
+        sim = Simulator(tenants, ngpus=ngpus, per_gpu_max_bsz=per_gpu_max_bsz, scheduler=RandomScheduler())
+        finish, history = sim.run()
+        for t_id in tenants:
+            if finish[t_id] < best_ft[t_id]:
+                best_ft[t_id] = finish[t_id]
+                best_history_and_finish[t_id] = (history, finish)
+    print(repr(RandomScheduler))
+    print(lower_bound)
+    for t_id in list(tenants.keys())[1:]: # ignore the first tenant
+        print(t_id, best_history_and_finish[t_id][1])
+        plot_timeline(best_history_and_finish[t_id][0], tenants, ngpus, per_gpu_max_bsz, f'random_for_tenant_{t_id}')
+
+    # Longest First
+    best_history_and_finish = {t_id: None for t_id in tenants}
+    best_ft = {t_id: float('inf') for t_id in tenants}
+    sim = Simulator(tenants, ngpus=ngpus, per_gpu_max_bsz=per_gpu_max_bsz, scheduler=LongestFirstScheduler())
+    finish, history = sim.run()
+    for t_id in tenants:
+        if finish[t_id] < best_ft[t_id]:
+            best_ft[t_id] = finish[t_id]
+            best_history_and_finish[t_id] = (history, finish)
+    print(repr(LongestFirstScheduler))
+    print(lower_bound)
+    print(t_id, best_history_and_finish[last_t_id][1])
+    plot_timeline(best_history_and_finish[last_t_id][0], tenants, ngpus, per_gpu_max_bsz, 'longest_first')
